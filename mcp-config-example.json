@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gateway": {
+      "command": "node",
+      "args": ["/Users/administrator/Development/Claude/gateway_mcp/dist/gateway.js"]
+    }
+  }
+}

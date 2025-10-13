@@ -1,0 +1,37 @@
+{
+  "name": "mcp-gateway",
+  "version": "1.0.0",
+  "description": "MCP Gateway Server - Routes and proxies requests to downstream MCP servers on-demand",
+  "type": "module",
+  "main": "dist/gateway.js",
+  "bin": {
+    "mcp-gateway": "dist/gateway.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/gateway.js",
+    "dev": "tsx src/gateway.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "gateway",
+    "router",
+    "proxy",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
