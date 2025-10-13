@@ -40,18 +40,20 @@ npm run dev
 
 ## Configuration
 
-Configure downstream servers in `src/registry.ts`:
+Configure downstream servers in `registry.config.json` (not committed to git):
 
-```typescript
+```json
 {
-  id: "server-id",
-  kind: "stdio",              // Only "stdio" supported (not "ws")
-  command: "node",
-  args: ["/path/to/server"],
-  connectTimeoutMs: 8000,     // Optional
-  idleTtlMs: 300000,          // 5 min idle timeout (optional)
+  "id": "server-id",
+  "kind": "stdio",
+  "command": "node",
+  "args": ["/path/to/server"],
+  "connectTimeoutMs": 8000,
+  "idleTtlMs": 300000
 }
 ```
+
+**First time setup**: Copy `registry.config.example.json` to `registry.config.json` and update paths to match your local environment.
 
 ## Gateway Tools
 
@@ -101,24 +103,29 @@ close({ serverId: "llm-memory" })
 
 ## Adding a Custom Server
 
-1. Add configuration to `src/registry.ts`:
-   ```typescript
+1. Create `registry.config.json` if it doesn't exist:
+   ```bash
+   cp registry.config.example.json registry.config.json
+   ```
+
+2. Add your server configuration to the JSON array:
+   ```json
    {
-     id: "my-server",
-     kind: "stdio",
-     command: "node",
-     args: ["/absolute/path/to/server.js"],
-     connectTimeoutMs: 8000,
-     idleTtlMs: 300000,
+     "id": "my-server",
+     "kind": "stdio",
+     "command": "node",
+     "args": ["/absolute/path/to/server.js"],
+     "connectTimeoutMs": 8000,
+     "idleTtlMs": 300000
    }
    ```
 
-2. Ensure the downstream server is built:
+3. Ensure the downstream server is built:
    ```bash
    cd /path/to/downstream/server && npm run build
    ```
 
-3. Rebuild and restart the gateway:
+4. Rebuild and restart the gateway:
    ```bash
    npm run build
    npm start
@@ -150,7 +157,7 @@ See `mcp-config-example.json` for a complete example.
 ## Limitations
 
 - **Stdio only**: WebSocket transport not yet implemented
-- **Static registry**: Server configurations are hardcoded (not dynamic)
+- **Local configuration required**: Each installation needs its own `registry.config.json` with absolute paths
 - **No rate limiting**: Add if exposing publicly
 - **No authentication**: Relies on process isolation
 
@@ -163,7 +170,9 @@ See `mcp-config-example.json` for a complete example.
 
 ## Troubleshooting
 
-**Server won't connect**: Verify the path in `src/registry.ts` and ensure the downstream server is built.
+**Server won't connect**: Verify paths in `registry.config.json` are absolute and ensure the downstream server is built.
+
+**"Registry config file not found"**: Copy `registry.config.example.json` to `registry.config.json` and configure your servers.
 
 **Tools not found**: Use `discover` to list available tools and verify the tool name matches exactly.
 

@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 export type ServerKind = "stdio" | "ws";
 
 export type ServerConfig = {
@@ -15,37 +19,31 @@ export type ServerConfig = {
   idleTtlMs?: number; // tempo dopo cui chiudere se inattivo
 };
 
-export const REGISTRY: ServerConfig[] = [
-  {
-    id: "llm-memory",
-    kind: "stdio",
-    command: "node",
-    args: ["/Users/administrator/Development/Claude/llm_memory_mcp/dist/src/index.js"],
-    connectTimeoutMs: 8000,
-    idleTtlMs: 5 * 60_000,
-  },
-  {
-    id: "code-trm",
-    kind: "stdio",
-    command: "node",
-    args: ["/Users/administrator/Development/Claude/code_trm_mcp/dist/server.js"],
-    connectTimeoutMs: 8000,
-    idleTtlMs: 5 * 60_000,
-  },
-  {
-    id: "codex",
-    kind: "stdio",
-    command: "node",
-    args: ["/Users/administrator/Development/Claude/codex_mcp/dist/index.js"],
-    connectTimeoutMs: 8000,
-    idleTtlMs: 5 * 60_000,
-  },
-  {
-    id: "code-analysis",
-    kind: "stdio",
-    command: "node",
-    args: ["/Users/administrator/Development/Claude/code_context/code-analysis-context-mcp/dist/index.js"],
-    connectTimeoutMs: 8000,
-    idleTtlMs: 5 * 60_000,
-  },
-];
+/**
+ * Load registry configuration from external file.
+ * Falls back to empty array if file doesn't exist or is invalid.
+ */
+function loadRegistry(): ServerConfig[] {
+  try {
+    const __dirname = fileURLToPath(new URL(".", import.meta.url));
+    const configPath = join(__dirname, "..", "registry.config.json");
+    const configContent = readFileSync(configPath, "utf-8");
+    const config = JSON.parse(configContent);
+
+    if (!Array.isArray(config)) {
+      console.error("Registry config must be an array");
+      return [];
+    }
+
+    return config as ServerConfig[];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      console.warn("Registry config file not found at registry.config.json - using empty registry");
+    } else {
+      console.error("Failed to load registry config:", error);
+    }
+    return [];
+  }
+}
+
+export const REGISTRY: ServerConfig[] = loadRegistry();

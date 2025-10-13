@@ -35,3 +35,6 @@ coverage/
 # Local development
 .claude/
 .llm-memory/
+
+# Registry configuration (contains local paths)
+registry.config.json

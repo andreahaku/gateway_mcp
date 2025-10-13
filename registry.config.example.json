@@ -1,0 +1,34 @@
+[
+  {
+    "id": "llm-memory",
+    "kind": "stdio",
+    "command": "node",
+    "args": ["/path/to/llm_memory_mcp/dist/src/index.js"],
+    "connectTimeoutMs": 8000,
+    "idleTtlMs": 300000
+  },
+  {
+    "id": "code-trm",
+    "kind": "stdio",
+    "command": "node",
+    "args": ["/path/to/code_trm_mcp/dist/server.js"],
+    "connectTimeoutMs": 8000,
+    "idleTtlMs": 300000
+  },
+  {
+    "id": "codex",
+    "kind": "stdio",
+    "command": "node",
+    "args": ["/path/to/codex_mcp/dist/index.js"],
+    "connectTimeoutMs": 8000,
+    "idleTtlMs": 300000
+  },
+  {
+    "id": "code-analysis",
+    "kind": "stdio",
+    "command": "node",
+    "args": ["/path/to/code-analysis-context-mcp/dist/index.js"],
+    "connectTimeoutMs": 8000,
+    "idleTtlMs": 300000
+  }
+]

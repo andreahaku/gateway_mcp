@@ -63,15 +63,20 @@ Main server implementation with three sections:
    - `dispatch`: Proxies tool call with 120-second timeout protection
    - `close`: Manually evicts connection from pool
 
-### `src/registry.ts` (52 lines)
+### `src/registry.ts` (~50 lines)
 
-Configuration for downstream servers. **This is the main file to edit when adding/removing servers.**
+Loads downstream server configuration from `registry.config.json` (gitignored). This file dynamically reads the JSON configuration at runtime and exports it as the `REGISTRY` constant.
 
-Current servers:
-- `llm-memory`: Persistent memory MCP at `/Users/administrator/Development/Claude/llm_memory_mcp`
-- `code-trm`: TRM-inspired code refinement at `/Users/administrator/Development/Claude/code_trm_mcp`
-- `codex`: Codex CLI integration at `/Users/administrator/Development/Claude/codex_mcp`
-- `code-analysis`: Codebase analysis at `/Users/administrator/Development/Claude/code_context/code-analysis-context-mcp`
+The registry configuration is kept in a separate JSON file to avoid committing local absolute paths to the repository.
+
+**Configuration file**: `registry.config.json` (root directory, gitignored)
+**Example template**: `registry.config.example.json` (committed to repo)
+
+Current servers (in your local config):
+- `llm-memory`: Persistent memory MCP
+- `code-trm`: TRM-inspired code refinement
+- `codex`: Codex CLI integration
+- `code-analysis`: Codebase analysis
 
 ## TypeScript Configuration
 
@@ -84,24 +89,38 @@ The project uses strict TypeScript with:
 
 ## Adding a New Downstream Server
 
-1. Edit `src/registry.ts` and add to the `REGISTRY` array:
+1. Create `registry.config.json` if it doesn't exist (copy from `registry.config.example.json`)
 
-```typescript
+2. Add your server configuration to the JSON array:
+
+```json
 {
-  id: "my-server",              // Unique ID for discovery/dispatch
-  kind: "stdio",                 // Only "stdio" supported (not "ws")
-  command: "node",               // Command to spawn
-  args: ["/path/to/server.js"],  // Absolute path to server entry point
-  connectTimeoutMs: 8000,        // Connection timeout (optional)
-  idleTtlMs: 300000,            // 5 min idle timeout (optional)
+  "id": "my-server",
+  "kind": "stdio",
+  "command": "node",
+  "args": ["/absolute/path/to/server/dist/index.js"],
+  "connectTimeoutMs": 8000,
+  "idleTtlMs": 300000
 }
 ```
 
-2. Ensure the downstream server is built: `cd /path/to/server && npm run build`
+**Configuration options**:
+- `id`: Unique identifier for discovery/dispatch (required)
+- `kind`: Transport type - only `"stdio"` supported (required)
+- `command`: Command to spawn the process (required)
+- `args`: Array of command arguments (optional)
+- `cwd`: Working directory for the process (optional)
+- `env`: Environment variables object (optional)
+- `connectTimeoutMs`: Connection timeout in ms (optional, default: 8000)
+- `idleTtlMs`: Idle time before auto-close in ms (optional, default: 300000)
 
-3. Rebuild gateway: `npm run build`
+3. Ensure the downstream server is built: `cd /path/to/server && npm run build`
 
-4. The new server is now accessible via `discover` and `dispatch` tools
+4. Rebuild gateway: `npm run build`
+
+5. The new server is now accessible via `discover` and `dispatch` tools
+
+**Note**: The `registry.config.json` file is gitignored to keep local paths private. Use `registry.config.example.json` as a reference.
 
 ## Error Handling Patterns
 
@@ -123,7 +142,7 @@ The gateway uses defensive patterns throughout:
 
 - **WebSocket transport not implemented**: Only `stdio` kind works. The `connectWs()` function throws an error.
 - **No rate limiting**: Multiple rapid tool calls can overwhelm downstream servers
-- **Hard-coded paths**: Registry contains absolute paths to downstream servers
+- **Local configuration required**: Each installation needs its own `registry.config.json` file with absolute paths
 - **No authentication**: Relies on process isolation for security
 
 ## Testing the Gateway
