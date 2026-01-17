@@ -16,10 +16,14 @@ Client (Claude Code/Cursor/etc)
 MCP Gateway (3 tools only)
     ↓
 Downstream Servers (loaded on-demand)
-    - llm-memory
-    - code-trm
-    - codex
-    - code-analysis
+    ├── Local (stdio)
+    │   - llm-memory
+    │   - code-trm
+    │   - codex
+    │   - code-analysis
+    └── Remote (http/sse)
+        - nuxt-ui-remote
+        - example-sse-server
 ```
 
 ## Automated Installation (Recommended)
@@ -75,6 +79,8 @@ npm run dev
 
 Configure downstream servers in `registry.config.json` (not committed to git):
 
+### Local Server (stdio)
+
 ```json
 {
   "id": "server-id",
@@ -86,7 +92,38 @@ Configure downstream servers in `registry.config.json` (not committed to git):
 }
 ```
 
-**First time setup**: Copy `registry.config.example.json` to `registry.config.json` and update paths to match your local environment.
+### Remote Server (HTTP/SSE)
+
+The gateway supports remote MCP servers via HTTP (Streamable HTTP with SSE fallback) and SSE transports:
+
+```json
+{
+  "id": "nuxt-ui-remote",
+  "kind": "http",
+  "url": "https://ui.nuxt.com/mcp",
+  "remote": true,
+  "connectTimeoutMs": 10000,
+  "idleTtlMs": 600000
+}
+```
+
+```json
+{
+  "id": "example-sse-server",
+  "kind": "sse",
+  "url": "https://example.com/mcp/sse",
+  "remote": true,
+  "connectTimeoutMs": 10000,
+  "idleTtlMs": 300000
+}
+```
+
+**Transport types**:
+- `stdio`: Local process communication (default)
+- `http`: Streamable HTTP transport with automatic SSE fallback (recommended for remote)
+- `sse`: Server-Sent Events transport (for servers that only support SSE)
+
+**First time setup**: Copy `registry.config.example.json` to `registry.config.json` and update paths/URLs to match your environment.
 
 ## Gateway Tools
 
@@ -100,6 +137,8 @@ Invokes a tool on a target server. Use `discover` first to see available tools.
 Manually closes a server connection and evicts it from the cache.
 
 ## Usage Example
+
+### Local Server (stdio)
 
 ```typescript
 // 1. Discover what tools are available
@@ -119,6 +158,27 @@ dispatch({
 // 3. Optionally close the connection when done
 close({ serverId: "llm-memory" })
 ```
+
+### Remote Server (HTTP/SSE)
+
+```typescript
+// 1. Discover tools from a remote MCP server
+discover({ serverId: "nuxt-ui-remote" })
+
+// 2. Call a tool on the remote server
+dispatch({
+  serverId: "nuxt-ui-remote",
+  tool: "get_component",
+  args: {
+    name: "Button"
+  }
+})
+
+// 3. Close the remote connection when done
+close({ serverId: "nuxt-ui-remote" })
+```
+
+Remote servers work identically to local servers from the client's perspective. The gateway handles the transport differences internally.
 
 ## Connection Management
 
@@ -142,6 +202,8 @@ close({ serverId: "llm-memory" })
    ```
 
 2. Add your server configuration to the JSON array:
+
+   **For local servers (stdio)**:
    ```json
    {
      "id": "my-server",
@@ -153,7 +215,19 @@ close({ serverId: "llm-memory" })
    }
    ```
 
-3. Ensure the downstream server is built:
+   **For remote servers (http/sse)**:
+   ```json
+   {
+     "id": "my-remote-server",
+     "kind": "http",
+     "url": "https://api.example.com/mcp",
+     "remote": true,
+     "connectTimeoutMs": 10000,
+     "idleTtlMs": 600000
+   }
+   ```
+
+3. For local servers, ensure the downstream server is built:
    ```bash
    cd /path/to/downstream/server && npm run build
    ```
@@ -189,10 +263,10 @@ See `mcp-config-example.json` for a complete example.
 
 ## Limitations
 
-- **Stdio only**: WebSocket transport not yet implemented
-- **Local configuration required**: Each installation needs its own `registry.config.json` with absolute paths
+- **WebSocket not implemented**: WebSocket transport is stubbed but not functional
+- **Local configuration required**: Each installation needs its own `registry.config.json` with paths/URLs
 - **No rate limiting**: Add if exposing publicly
-- **No authentication**: Relies on process isolation
+- **No authentication**: Relies on process isolation for local servers; remote servers may require their own auth
 
 ## Documentation
 
@@ -203,13 +277,17 @@ See `mcp-config-example.json` for a complete example.
 
 ## Troubleshooting
 
-**Server won't connect**: Verify paths in `registry.config.json` are absolute and ensure the downstream server is built.
+**Local server won't connect**: Verify paths in `registry.config.json` are absolute and ensure the downstream server is built.
+
+**Remote server won't connect**: Check the URL is correct and accessible. The gateway tries Streamable HTTP first, then falls back to SSE for `http` kind servers.
 
 **"Registry config file not found"**: Copy `registry.config.example.json` to `registry.config.json` and configure your servers.
 
 **Tools not found**: Use `discover` to list available tools and verify the tool name matches exactly.
 
 **High memory usage**: Reduce `idleTtlMs` or manually `close` servers when done.
+
+**Remote server timeout**: Increase `connectTimeoutMs` for remote servers (10000ms+ recommended for network latency).
 
 ## License
 

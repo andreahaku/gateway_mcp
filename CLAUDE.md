@@ -30,6 +30,8 @@ npm run dev
 
 ```
 MCP Client → Gateway (3 tools) → Downstream Server (on-demand) → Tool Execution
+                                     ├── Local (stdio)
+                                     └── Remote (http/sse)
 ```
 
 The gateway maintains a connection pool with automatic lifecycle management:
@@ -37,6 +39,7 @@ The gateway maintains a connection pool with automatic lifecycle management:
 - **Connection caching**: Active connections reused via `ensureConnection()`
 - **Automatic GC**: Idle connections closed after `idleTtlMs` (default: 5 minutes)
 - **Graceful cleanup**: Failed connections cleaned up properly
+- **Transport abstraction**: Local (stdio) and remote (http/sse) servers handled uniformly
 
 ### Two-Step Tool Pattern
 
@@ -81,6 +84,10 @@ Main server implementation organized into three functional areas:
 **2. Connection Management** (middle section):
    - `connectStdio()`: Spawns stdio-based MCP server using `StdioClientTransport`
    - `connectWs()`: Stub for WebSocket (throws error, not implemented)
+   - `connectHttp()`: Connects to remote servers using Streamable HTTP or SSE transport
+     - Tries `StreamableHTTPClientTransport` first (recommended for modern servers)
+     - Falls back to `SSEClientTransport` if Streamable HTTP fails
+     - Can be forced to use SSE-only via `forceSSE` parameter
    - `ensureConnection()`: Connection pool with lazy loading and error cleanup
    - `scheduleGc()`: 30-second interval to close idle connections
    - `withTimeout()`: Wraps promises with timeout protection
@@ -99,19 +106,24 @@ The registry configuration is kept in a separate JSON file to avoid committing l
 
 **Key exports**:
 - `ServerConfig` type: TypeScript interface for server configuration
-- `ServerKind` type: Either `"stdio"` or `"ws"`
+- `ServerKind` type: `"stdio"`, `"ws"`, `"http"`, or `"sse"`
 - `REGISTRY` constant: Array of configured servers loaded at startup
 
 **Configuration file**: `registry.config.json` (root directory, gitignored)
 **Example template**: `registry.config.example.json` (committed to repo)
 
-**Note**: Contains one Italian comment at line 19 that should be translated: "tempo dopo cui chiudere se inattivo" → "time after which to close if idle"
+**Note**: Contains Italian comments that should be translated:
+- Line 15: "Per server remoti (http, sse, ws)" → "For remote servers (http, sse, ws)"
+- Line 17: "Flag opzionale per indicare server remoto" → "Optional flag to indicate remote server"
+- Line 21: "tempo dopo cui chiudere se inattivo" → "time after which to close if idle"
 
 Example servers in local config:
-- `llm-memory`: Persistent memory MCP
-- `code-trm`: TRM-inspired code refinement
-- `codex`: Codex CLI integration
-- `code-analysis`: Codebase analysis
+- `llm-memory`: Persistent memory MCP (stdio)
+- `code-trm`: TRM-inspired code refinement (stdio)
+- `codex`: Codex CLI integration (stdio)
+- `code-analysis`: Codebase analysis (stdio)
+- `nuxt-ui-remote`: Example remote HTTP server
+- `example-sse-server`: Example remote SSE server
 
 ## TypeScript Configuration
 
@@ -128,6 +140,7 @@ The project uses strict TypeScript with:
 
 2. Add your server configuration to the JSON array:
 
+**For local servers (stdio)**:
 ```json
 {
   "id": "my-server",
@@ -139,17 +152,36 @@ The project uses strict TypeScript with:
 }
 ```
 
+**For remote servers (http/sse)**:
+```json
+{
+  "id": "my-remote-server",
+  "kind": "http",
+  "url": "https://api.example.com/mcp",
+  "remote": true,
+  "connectTimeoutMs": 10000,
+  "idleTtlMs": 600000
+}
+```
+
 **Configuration options**:
 - `id`: Unique identifier for discovery/dispatch (required)
-- `kind`: Transport type - only `"stdio"` supported (required)
-- `command`: Command to spawn the process (required)
-- `args`: Array of command arguments (optional)
-- `cwd`: Working directory for the process (optional)
-- `env`: Environment variables object (optional)
+- `kind`: Transport type - `"stdio"`, `"http"`, or `"sse"` (required)
+- `command`: Command to spawn the process (required for stdio)
+- `args`: Array of command arguments (optional, stdio only)
+- `cwd`: Working directory for the process (optional, stdio only)
+- `env`: Environment variables object (optional, stdio only)
+- `url`: Server URL (required for http/sse)
+- `remote`: Boolean flag for remote servers (optional, inferred from kind)
 - `connectTimeoutMs`: Connection timeout in ms (optional, default: 8000)
 - `idleTtlMs`: Idle time before auto-close in ms (optional, default: 300000)
 
-3. Ensure the downstream server is built: `cd /path/to/server && npm run build`
+**Transport types**:
+- `stdio`: Local process communication via stdin/stdout
+- `http`: Streamable HTTP transport with automatic SSE fallback (recommended for remote)
+- `sse`: Server-Sent Events transport (for servers that only support SSE)
+
+3. For local servers, ensure the downstream server is built: `cd /path/to/server && npm run build`
 
 4. Rebuild gateway: `npm run build`
 
@@ -194,20 +226,26 @@ When a downstream server fails to connect or behaves unexpectedly:
    - `"listTools failed"`: Server started but doesn't implement MCP protocol correctly
    - `"timeout"`: Server started but took >8 seconds to connect (increase `connectTimeoutMs`)
    - `"tool call timed out"`: Tool execution exceeded 120 seconds (expected for long-running operations)
+   - `"Streamable HTTP failed... falling back to SSE"`: Normal behavior for servers that only support SSE
 
-5. **Manual connection test**: Run the downstream server directly with its stdio transport to verify it works:
-   ```bash
-   node /path/to/server/dist/index.js
-   ```
+5. **Manual connection test**:
+   - For local servers: Run directly with its stdio transport:
+     ```bash
+     node /path/to/server/dist/index.js
+     ```
+   - For remote servers: Test the URL is accessible:
+     ```bash
+     curl -I https://api.example.com/mcp
+     ```
 
 ## Limitations and Known Issues
 
-- **WebSocket transport not implemented**: Only `stdio` kind works. The `connectWs()` function in `src/gateway.ts:83-88` throws an error.
+- **WebSocket transport not implemented**: The `connectWs()` function in `src/gateway.ts` throws an error. Use `http` or `sse` for remote servers.
 - **No tests**: Test suite not yet implemented. The `npm test` command will fail.
 - **No rate limiting**: Multiple rapid tool calls can overwhelm downstream servers
-- **Local configuration required**: Each installation needs its own `registry.config.json` file with absolute paths
-- **No authentication**: Relies on process isolation for security
-- **Italian comment in code**: One comment in `src/registry.ts:19` needs translation
+- **Local configuration required**: Each installation needs its own `registry.config.json` file with paths/URLs
+- **No authentication**: Relies on process isolation for local servers; remote servers handle their own auth
+- **Italian comments in code**: Several comments in `src/registry.ts` need translation (lines 15, 17, 21)
 
 ## Testing the Gateway
 
@@ -218,9 +256,16 @@ After building, you can test the gateway manually:
 node dist/gateway.js
 
 # In an MCP client, use the gateway tools:
+
+# Local server example:
 # 1. discover: { "serverId": "llm-memory" }
 # 2. dispatch: { "serverId": "llm-memory", "tool": "mem.list", "args": {} }
 # 3. close: { "serverId": "llm-memory" }
+
+# Remote server example:
+# 1. discover: { "serverId": "nuxt-ui-remote" }
+# 2. dispatch: { "serverId": "nuxt-ui-remote", "tool": "get_component", "args": { "name": "Button" } }
+# 3. close: { "serverId": "nuxt-ui-remote" }
 ```
 
 ## Code Quality Standards
@@ -241,7 +286,7 @@ Recent improvements (commit 1c48134):
 - Mostly translated Italian comments to English (one remains)
 
 **Known code quality issues**:
-- One Italian comment in `src/registry.ts:19` needs translation
+- Italian comments in `src/registry.ts` (lines 15, 17, 21) need translation
 - No tests implemented
 - No linting configuration (ESLint/Prettier)
 
