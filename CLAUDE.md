@@ -118,10 +118,15 @@ The registry configuration is kept in a separate JSON file to avoid committing l
 - Line 21: "tempo dopo cui chiudere se inattivo" → "time after which to close if idle"
 
 Example servers in local config:
-- `llm-memory`: Persistent memory MCP (stdio)
-- `code-trm`: TRM-inspired code refinement (stdio)
-- `codex`: Codex CLI integration (stdio)
-- `code-analysis`: Codebase analysis (stdio)
+- `llm-memory`: Persistent memory MCP (stdio, Node.js)
+- `code-trm`: TRM-inspired code refinement (stdio, Node.js)
+- `code-trm-python`: TRM for Python projects (stdio, Python/uvx)
+- `codex`: Codex CLI integration (stdio, Node.js)
+- `code-analysis`: Codebase analysis (stdio, Node.js)
+- `code-analysis-python`: Code analysis for Python (stdio, Python/uvx)
+- `code-analysis-java`: Code analysis for Java/Spring (stdio, Java)
+- `code-trm-java`: TRM for Java projects (stdio, Java)
+- `poeditor`: POEditor integration (stdio, Node.js)
 - `nuxt-ui-remote`: Example remote HTTP server
 - `example-sse-server`: Example remote SSE server
 
@@ -140,13 +145,37 @@ The project uses strict TypeScript with:
 
 2. Add your server configuration to the JSON array:
 
-**For local servers (stdio)**:
+**For local Node.js servers (stdio)**:
 ```json
 {
   "id": "my-server",
   "kind": "stdio",
   "command": "node",
   "args": ["/absolute/path/to/server/dist/index.js"],
+  "connectTimeoutMs": 8000,
+  "idleTtlMs": 300000
+}
+```
+
+**For Python servers (stdio with uvx)**:
+```json
+{
+  "id": "my-python-server",
+  "kind": "stdio",
+  "command": "uvx",
+  "args": ["my-python-mcp-package"],
+  "connectTimeoutMs": 8000,
+  "idleTtlMs": 300000
+}
+```
+
+**For Java servers (stdio with java -jar)**:
+```json
+{
+  "id": "my-java-server",
+  "kind": "stdio",
+  "command": "java",
+  "args": ["-jar", "/absolute/path/to/server/target/server-1.0.0.jar"],
   "connectTimeoutMs": 8000,
   "idleTtlMs": 300000
 }
@@ -181,13 +210,52 @@ The project uses strict TypeScript with:
 - `http`: Streamable HTTP transport with automatic SSE fallback (recommended for remote)
 - `sse`: Server-Sent Events transport (for servers that only support SSE)
 
-3. For local servers, ensure the downstream server is built: `cd /path/to/server && npm run build`
+3. For local servers, ensure the downstream server is built:
+   - **Node.js**: `cd /path/to/server && npm run build`
+   - **Python**: Package should be published or available via uvx
+   - **Java**: `cd /path/to/server && mvn clean package`
 
 4. Rebuild gateway: `npm run build`
 
 5. The new server is now accessible via `discover` and `dispatch` tools
 
 **Note**: The `registry.config.json` file is gitignored to keep local paths private. Use `registry.config.example.json` as a reference.
+
+### Using the Installation Script
+
+The gateway includes an automated installation script (`install.sh`) that:
+- Builds the gateway
+- Configures Claude Code
+- Discovers and installs downstream MCP servers
+- Supports Node.js, Python, and Java servers
+
+**Server types supported**:
+- **nodejs**: Builds with `pnpm install && pnpm run build`
+- **python**: Uses `uvx` package manager (no build needed)
+- **java**: Builds with `mvn clean package -DskipTests`
+
+To add a server to the installation script, edit the `MCP_SERVERS` array in [install.sh](install.sh):
+
+```bash
+MCP_SERVERS=(
+    "dir_name|repo_url|server_id|entry_point|type"
+)
+```
+
+Example entries:
+```bash
+# Node.js server
+"my_server|https://github.com/user/my_server|my-server|dist/index.js|nodejs"
+
+# Python server
+"my_python_mcp|https://github.com/user/my_python_mcp|my-python|my_python_mcp|python"
+
+# Java server
+"my_java_mcp|https://github.com/user/my_java_mcp|my-java|target/my-server-1.0.0.jar|java"
+
+# Local-only (no GitHub URL needed)
+"local_server|LOCAL|local-server|dist/index.js|nodejs"
+```
 
 ## Error Handling Patterns
 

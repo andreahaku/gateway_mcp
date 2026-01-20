@@ -115,7 +115,7 @@ else
 fi
 
 # MCP Server definitions (format: dir_name|repo_url|server_id|entry_point|type)
-# type: nodejs or python
+# type: nodejs, python, or java
 MCP_SERVERS=(
     "llm_memory_mcp|https://github.com/andreahaku/llm_memory_mcp|llm-memory|dist/src/index.js|nodejs"
     "codex_mcp|https://github.com/andreahaku/codex_mcp|codex|dist/index.js|nodejs"
@@ -124,6 +124,8 @@ MCP_SERVERS=(
     "code_trm_python_mcp|https://github.com/andreahaku/code_trm_python_mcp|code-trm-python|code_trm_python_mcp|python"
     "code-analysis-context-python-mcp|https://github.com/andreahaku/code-analysis-context-python-mcp|code-analysis-python|code-analysis-context-python-mcp|python"
     "poeditor_mcp|https://github.com/andreahaku/poeditor_mcp|poeditor|dist/index.js|nodejs"
+    "code-analysis-context-java-spring-mcp|LOCAL|code-analysis-java|target/code-analysis-context-java-spring-mcp-1.0.0.jar|java"
+    "code_trm_java_mcp|LOCAL|code-trm-java|target/code-trm-java-mcp-0.1.0.jar|java"
 )
 
 # Function to add server to registry
@@ -160,6 +162,16 @@ if (serverType === 'python') {
         kind: "stdio",
         command: "uvx",
         args: [entryPoint],
+        connectTimeoutMs: 8000,
+        idleTtlMs: 300000
+    };
+} else if (serverType === 'java') {
+    // Java MCP servers use java -jar
+    newEntry = {
+        id: serverId,
+        kind: "stdio",
+        command: "java",
+        args: ["-jar", serverPath + '/' + entryPoint],
         connectTimeoutMs: 8000,
         idleTtlMs: 300000
     };
@@ -202,6 +214,19 @@ for server_def in "${MCP_SERVERS[@]}"; do
             # Python MCP - just add to registry, no build needed
             echo "  Python MCP server, adding to registry..."
             add_to_registry "$server_id" "$SERVER_PATH" "$entry_point" "$server_type"
+        elif [[ "$server_type" == "java" ]]; then
+            # Java MCP - check if JAR exists
+            if [[ -f "$SERVER_PATH/$entry_point" ]]; then
+                echo "  Already built, adding to registry..."
+            else
+                echo "  Not built yet, building Maven project..."
+                cd "$SERVER_PATH"
+                mvn clean package -DskipTests
+                echo -e "  ${GREEN}Built successfully${NC}"
+            fi
+
+            # Add to registry
+            add_to_registry "$server_id" "$SERVER_PATH" "$entry_point" "$server_type"
         else
             # Node.js MCP - check if built
             if [[ -d "$SERVER_PATH/dist" ]]; then
@@ -233,6 +258,10 @@ for server_def in "${MCP_SERVERS[@]}"; do
 
             if [[ "$server_type" == "python" ]]; then
                 echo "  Python MCP server - no build needed"
+            elif [[ "$server_type" == "java" ]]; then
+                echo "  Building Maven project..."
+                cd "$SERVER_PATH"
+                mvn clean package -DskipTests
             else
                 echo "  Installing dependencies..."
                 cd "$SERVER_PATH"
