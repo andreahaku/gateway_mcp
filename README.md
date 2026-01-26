@@ -17,10 +17,9 @@ MCP Gateway (3 tools only)
     ↓
 Downstream Servers (loaded on-demand)
     ├── Local (stdio)
-    │   - llm-memory
-    │   - code-trm
-    │   - codex
-    │   - code-analysis
+    │   - Node.js: llm-memory, code-trm, codex, code-analysis
+    │   - Python: code-trm-python, code-analysis-python
+    │   - Java: code-analysis-java, code-trm-java
     └── Remote (http/sse)
         - nuxt-ui-remote
         - example-sse-server
@@ -39,13 +38,9 @@ This script will:
 2. Configure Claude Code to use the gateway
 3. Check for available MCP servers in the parent directory
 4. Offer to clone, install, and configure any missing servers:
-   - llm_memory_mcp
-   - codex_mcp
-   - code-analysis-context-mcp
-   - code_trm_mcp
-   - code_trm_python_mcp
-   - code-analysis-context-python-mcp
-   - poeditor_mcp
+   - **Node.js**: llm_memory_mcp, codex_mcp, code-analysis-context-mcp, code_trm_mcp, poeditor_mcp
+   - **Python**: code_trm_python_mcp, code-analysis-context-python-mcp
+   - **Java**: code-analisys-context-java-spring-mcp, code_trm_java_mcp
 
 After installation, restart Claude Code to load the gateway.
 
@@ -79,14 +74,39 @@ npm run dev
 
 Configure downstream servers in `registry.config.json` (not committed to git):
 
-### Local Server (stdio)
+### Local Servers (stdio)
 
+**Node.js Server**:
 ```json
 {
   "id": "server-id",
   "kind": "stdio",
   "command": "node",
-  "args": ["/path/to/server"],
+  "args": ["/path/to/server/dist/index.js"],
+  "connectTimeoutMs": 8000,
+  "idleTtlMs": 300000
+}
+```
+
+**Python Server (via uvx)**:
+```json
+{
+  "id": "python-server",
+  "kind": "stdio",
+  "command": "uvx",
+  "args": ["python-mcp-package"],
+  "connectTimeoutMs": 8000,
+  "idleTtlMs": 300000
+}
+```
+
+**Java Server**:
+```json
+{
+  "id": "java-server",
+  "kind": "stdio",
+  "command": "java",
+  "args": ["-jar", "/path/to/server/target/server-1.0.0.jar"],
   "connectTimeoutMs": 8000,
   "idleTtlMs": 300000
 }
@@ -203,19 +223,43 @@ Remote servers work identically to local servers from the client's perspective. 
 
 2. Add your server configuration to the JSON array:
 
-   **For local servers (stdio)**:
+   **Node.js server**:
    ```json
    {
      "id": "my-server",
      "kind": "stdio",
      "command": "node",
-     "args": ["/absolute/path/to/server.js"],
+     "args": ["/absolute/path/to/server/dist/index.js"],
      "connectTimeoutMs": 8000,
      "idleTtlMs": 300000
    }
    ```
 
-   **For remote servers (http/sse)**:
+   **Python server**:
+   ```json
+   {
+     "id": "my-python-server",
+     "kind": "stdio",
+     "command": "uvx",
+     "args": ["my-python-mcp-package"],
+     "connectTimeoutMs": 8000,
+     "idleTtlMs": 300000
+   }
+   ```
+
+   **Java server**:
+   ```json
+   {
+     "id": "my-java-server",
+     "kind": "stdio",
+     "command": "java",
+     "args": ["-jar", "/absolute/path/to/server/target/server-1.0.0.jar"],
+     "connectTimeoutMs": 8000,
+     "idleTtlMs": 300000
+   }
+   ```
+
+   **Remote server**:
    ```json
    {
      "id": "my-remote-server",
@@ -228,9 +272,9 @@ Remote servers work identically to local servers from the client's perspective. 
    ```
 
 3. For local servers, ensure the downstream server is built:
-   ```bash
-   cd /path/to/downstream/server && npm run build
-   ```
+   - **Node.js**: `cd /path/to/server && npm run build`
+   - **Python**: Package should be available via uvx
+   - **Java**: `cd /path/to/server && mvn clean package`
 
 4. Rebuild and restart the gateway:
    ```bash
